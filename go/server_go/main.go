@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -94,12 +95,30 @@ func transferData(ws *websocket.Conn, wsTarget *websocket.Conn) {
 		wsTarget.Write(buf[:n])
 	}
 }
-func giveAllClients() {
+func namesHandler(w http.ResponseWriter, r *http.Request) {
+	// Define an array of names
+	names := make([]string, 0, len(server.conns))
 
+	// Append each value from the map to the slice
+	for _, value := range server.conns {
+		names = append(names, value)
+	}
+
+	// Set the Content-Type header to application/json
+	w.Header().Set("Content-Type", "application/json")
+
+	// Encode the array as JSON and write to the response
+	if err := json.NewEncoder(w).Encode(names); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
+
+var server *Server
+
 func main() {
-	server := NewServer()
+	server = NewServer()
 	http.Handle("/ws", websocket.Handler(server.handleWs))
 	// create a http endpoint to send the data of all client name
+	http.HandleFunc("/discovery", namesHandler)
 	http.ListenAndServe(":3000", nil)
 }
