@@ -168,13 +168,19 @@ func senderThread(filepath string, clientName string) {
 func main() {
 
 	go recieverThread()
-	ln, _ := net.Listen("tcp", ":8080")
+
+	ln, err := net.Listen("tcp", ":4500")
+	if err != nil {
+		fmt.Println("some error in listeing to java", err)
+	}
 	conn, _ := ln.Accept()
 
 	reader := bufio.NewReader(conn)
 	for {
 		// Read until a newline or EOF
+		fmt.Println("listening for the java program")
 		message, err := reader.ReadString('\n')
+		fmt.Println("Java Responded with something")
 		if err != nil {
 			fmt.Println("Error reading:", err)
 			break
@@ -183,13 +189,16 @@ func main() {
 		clients := getAllClients()
 		fmt.Println(clients)
 		// send back to socket
+
+		fmt.Println("sending ")
 		encoder := json.NewEncoder(conn)
 		if err := encoder.Encode(clients); err != nil {
 			fmt.Println("Error encoding JSON:", err)
-			return
+
 		}
 
 		// wait for response
+		fmt.Println("waiting for java to select a client")
 		message, err = reader.ReadString('\n')
 		if err != nil {
 			fmt.Println("Error reading from client:", err)

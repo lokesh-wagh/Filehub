@@ -38,56 +38,75 @@ func (s *Server) handleWs(ws *websocket.Conn) {
 	s.readLoop(ws)
 
 }
+func (s *Server) disconnect(ws *websocket.Conn) {
+	name := s.conns[ws]
+	delete(s.conns, ws)
+	delete(s.users, name)
+	ws.Close()
+}
 func (s *Server) readLoop(ws *websocket.Conn) {
 	buf := make([]byte, 1024)
+	count := 0
 	for {
 		n, err := ws.Read(buf)
 		buf := buf[:n]
 		if err != nil {
-			if err == io.EOF {
+			count++
+			// if err == io.EOF {
+			// 	s.disconnect(ws)
+			// 	break
+			// }
+			// if err == net.ErrClosed {
+			// 	s.disconnect(ws)
+			// 	break
+			// }
+			if count > 10 {
+				s.disconnect(ws)
 				break
 			}
-			fmt.Println("error in communicating ", err)
-		}
-		msg := string(buf[:n])
-		if msg == "Read All Client" {
-			buf[0] = byte(len(s.conns))
-			ws.Write(buf)
-			for _, v := range s.conns {
-				ws.Write([]byte(v))
-			}
-		}
-		if msg == "Transfer File To Client" {
-			n, err := ws.Read(buf)
-			if err != nil {
-				fmt.Println("error in reading target name", err)
-			}
-			targetName := string(buf[:n])
-			wsTarget := s.users[targetName]
-			wsTarget.Write([]byte("File Transfer Request"))
 
-			n, err = wsTarget.Read(buf)
-			if err != nil {
-				fmt.Println("error in reading target respone", err)
+		} else {
+			msg := string(buf[:n])
+			if msg == "Read All Client" {
+				buf[0] = byte(len(s.conns))
+				ws.Write(buf)
+				for _, v := range s.conns {
+					ws.Write([]byte(v))
+				}
 			}
-			msg = string(buf)
-			if msg == "Accepted" {
-				ws.Write([]byte("Initiate"))
-				transferData(ws, wsTarget)
+			if msg == "Transfer File To Client" {
+				n, err := ws.Read(buf)
+				if err != nil {
+					fmt.Println("error in reading target name", err)
+				}
+				targetName := string(buf[:n])
+				wsTarget := s.users[targetName]
+				wsTarget.Write([]byte("File Transfer Request"))
+
+				n, err = wsTarget.Read(buf)
+				if err != nil {
+					fmt.Println("error in reading target respone", err)
+				}
+				msg = string(buf)
+				if msg == "Accepted" {
+					ws.Write([]byte("Initiate"))
+					s.transferData(ws, wsTarget)
+				}
 			}
+			fmt.Println(msg)
 		}
-		fmt.Println(msg)
 
 	}
 }
 
-func transferData(ws *websocket.Conn, wsTarget *websocket.Conn) {
+func (s *Server) transferData(ws *websocket.Conn, wsTarget *websocket.Conn) {
 	buf := make([]byte, 1024)
 	// exchange file metadata here
 	for {
 		n, err := ws.Read(buf)
 		if err != nil {
 			if err == io.EOF {
+				s.disconnect(ws)
 				break
 			}
 			fmt.Println("error in sending a chunk", err)
