@@ -1,10 +1,9 @@
-module go_backend
+module Filehub
 
 go 1.23.2
 
 require (
-	github.com/TheTitanrain/w32 v0.0.0-20180517000239-4f5cfb03fabf // indirect
-	github.com/andlabs/ui v0.0.0-20200610043537-70a69d6ae31e // indirect
-	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627 // indirect
-	golang.org/x/net v0.30.0 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/spf13/cobra v1.8.1 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
 )

@@ -1,8 +1,9 @@
-package main
+package daemongo_tcp
 
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // Peer represents a peer with a name, IP, and port
@@ -44,7 +46,29 @@ type MetaData struct {
 	RecieverPort   int
 }
 
-func transferFileReciver(meta MetaData) {
+func RemoveControlCharacters(input string) string {
+	// Use strings.Map to remove control characters
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1 // Return -1 to remove the control character
+		}
+		return r // Keep non-control characters
+	}, input)
+}
+func ReadStringFromTCP(conn net.Conn) string {
+	fmt.Println("Waiting for response from java client")
+
+	buf := make([]byte, 1024)
+	n, err := conn.Read(buf)
+
+	if err != nil {
+		fmt.Println("error in reading from java client")
+		return ""
+	}
+	msg := string(buf[:n])
+	return msg
+}
+func TransferFileReciver(meta MetaData) {
 	fmt.Println(meta)
 	portStr := ":" + strconv.Itoa(int(meta.RecieverPort))
 	listen, err := net.Listen("tcp", portStr)
@@ -80,7 +104,7 @@ func transferFileReciver(meta MetaData) {
 	fmt.Println("File received successfully!")
 	conn.Close()
 }
-func transferFileSender(meta MetaData, filepath string) {
+func TransferFileSender(meta MetaData, filepath string) {
 	fmt.Println("transferring file from sender", meta)
 	serverAddr := meta.RecieverIp + ":" + strconv.Itoa(int(meta.RecieverPort))
 	conn, err := net.Dial("tcp", serverAddr)
@@ -107,7 +131,7 @@ func transferFileSender(meta MetaData, filepath string) {
 	fmt.Println("File sent successfully!")
 
 }
-func handshakeWithPeer(conn net.Conn) (bool, MetaData) {
+func HandshakeWithPeer(javaclientConn net.Conn, conn net.Conn) (bool, MetaData) {
 	defer conn.Close()
 
 	decoder := gob.NewDecoder(conn)
@@ -123,8 +147,19 @@ func handshakeWithPeer(conn net.Conn) (bool, MetaData) {
 
 	fmt.Println("request recieved", hreq)
 	response := HandShakeResponse{}
-	response.Response = true
-	response.RecieverPort = 6969
+
+	jsonData, err := json.Marshal(hreq)
+	javaclientConn.Write(jsonData)
+
+	msg := ReadStringFromTCP(javaclientConn)
+	args := strings.Fields(msg)
+	fmt.Println("java client said", msg)
+	if args[0] == "accept" {
+		response.Response = true
+		response.RecieverPort, _ = strconv.Atoi(args[1])
+	} else {
+		response.Response = false
+	}
 	// Create a new encoder that will write the response back to the connection
 	encoder := gob.NewEncoder(conn)
 
@@ -150,17 +185,16 @@ func handshakeWithPeer(conn net.Conn) (bool, MetaData) {
 		return false, MetaData{}
 	}
 }
-func receiverThread() {
+func ReceiverThread(javaclientConn net.Conn, username string) {
+
+	listener, err := net.Listen("tcp", ":0")
+	port := listener.Addr().(*net.TCPAddr).Port
 	peer := Peer{
-		Name: "peer3",
-		Port: 8069,
-		Ip:   "127.0.0.1",
+		Name: username,
+		Port: uint16(port),
+		Ip:   "blank string does not matter",
 	}
-	registerPeer(peer)
-
-	portStr := ":" + strconv.Itoa(int(peer.Port))
-
-	listener, err := net.Listen("tcp", portStr)
+	RegisterPeer(peer)
 	if err != nil {
 		fmt.Println("Error starting TCP listener:", err)
 		return
@@ -178,14 +212,14 @@ func receiverThread() {
 		}
 
 		// Handle the connection (in a new goroutine, typically)
-		flag, metadata := handshakeWithPeer(conn)
+		flag, metadata := HandshakeWithPeer(javaclientConn, conn)
 		if flag == true {
-			transferFileReciver(metadata)
+			TransferFileReciver(metadata)
 		}
 	}
 }
 
-func getLocalIP() (string, error) {
+func GetLocalIP() (string, error) {
 	// Get all network interfaces on the system
 	interfaces, err := net.Interfaces()
 	if err != nil {
@@ -212,8 +246,8 @@ func getLocalIP() (string, error) {
 	return "", fmt.Errorf("no valid IP address found")
 }
 
-func senderThread(path string, peerName string) {
-	peer, err := resolvePeer(peerName)
+func SenderThread(javaclientConn net.Conn, path string, peerName string) {
+	peer, err := ResolvePeer(peerName)
 	if err != nil {
 		fmt.Println("Error Connecting to The Peer ", err)
 	}
@@ -222,7 +256,7 @@ func senderThread(path string, peerName string) {
 	if err != nil {
 		fmt.Println("Error Connecting Opening and Getting File info ", err)
 	}
-	ip, err := getLocalIP()
+	ip, err := GetLocalIP()
 	if err != nil {
 		fmt.Println("Error Getting the IP", err)
 	}
@@ -249,6 +283,8 @@ func senderThread(path string, peerName string) {
 	if err != nil {
 		fmt.Println("Error in Recieving Handshake to Server", err)
 	}
+
+	fmt.Println("Reciveved response is ", res)
 	if res.Response {
 		meta := MetaData{}
 		meta.Filename = req.Filename
@@ -257,19 +293,15 @@ func senderThread(path string, peerName string) {
 		meta.SenderIp = req.SenderIp
 		meta.SenderPort = req.SenderPort
 		meta.Size = req.Size
-		transferFileSender(meta, path)
+		TransferFileSender(meta, path)
 	}
 	fmt.Println(res)
 
 }
-func main() {
-	// Register the client as a peer
-	receiverThread()
-}
 
-func resolvePeer(peerID string) (*Peer, error) {
+func ResolvePeer(peerID string) (*Peer, error) {
 	// Create the URL for the resolve endpoint
-	url := fmt.Sprintf("http://localhost:5000/resolve?id=%s", peerID)
+	url := fmt.Sprintf("http://localhost:5000/resolve?id=%s", RemoveControlCharacters(peerID))
 	fmt.Println(url)
 	// Send the HTTP GET request to the server
 	resp, err := http.Get(url)
@@ -301,7 +333,7 @@ func resolvePeer(peerID string) (*Peer, error) {
 }
 
 // registerPeer sends a POST request to register the peer with the server
-func registerPeer(peer Peer) error {
+func RegisterPeer(peer Peer) error {
 	// Prepare the request body with the peer details (encode as gob)
 	var buf bytes.Buffer
 	encoder := gob.NewEncoder(&buf)
@@ -333,7 +365,7 @@ func registerPeer(peer Peer) error {
 }
 
 // getPeers sends a GET request to the provided endpoint and returns the decoded peers map
-func getPeers(endpoint string) (map[string]Peer, error) {
+func GetPeers(endpoint string) ([]string, error) {
 	resp, err := http.Get("http://localhost:5000" + endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request to %s: %v", endpoint, err)
@@ -350,12 +382,17 @@ func getPeers(endpoint string) (map[string]Peer, error) {
 	if err := decoder.Decode(&peers); err != nil {
 		return nil, fmt.Errorf("failed to decode gob data: %v", err)
 	}
+	keys := make([]string, 0, len(peers))
 
-	return peers, nil
+	// Append each key to the slice
+	for key := range peers {
+		keys = append(keys, key)
+	}
+	return keys, nil
 }
 
 // printPeers prints all the peers in the map
-func printPeers(peers map[string]Peer) {
+func PrintPeers(peers map[string]Peer) {
 	for _, peer := range peers {
 		fmt.Printf("ID: %s, IP: %s, Port: %d\n", peer.Name, peer.Ip, peer.Port)
 	}
