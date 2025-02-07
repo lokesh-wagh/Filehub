@@ -1,24 +1,39 @@
-# Filehub
+# 🎉 Weekend of Code 🚀  
 
-Welcome to the application! This Java-based application provides a user interface for uploading files. It is designed to demonstrate basic Java Swing components, including labels, text fields, buttons, and progress bars.
+## 🏆 Team Name  
+**[Your Team Name]**  
 
-## Features
+## 👨‍💻 Team Members  
+- 🧑‍💻 [Member 1]  
+- 👩‍💻 [Member 2]  
+- 🧑‍💻 [Member 3]  
+- 👩‍💻 [Member 4]  
 
-- User-friendly interface for file uploads
-- File chooser to select files
-- Progress bar to indicate upload status
-- Upload and Cancel functionality
--
-- 
+## 📌 Project Name  
+**[Your Project Name]**  
+**[Describe Your Project]** 
+ 
+## 📄 Abstract  
+🔗 [Link to Abstract]  
 
-## Requirements
-- to be 
+---
 
-## Getting Started
+## ✨ Features Implemented  
+- ✅ [Feature 1] 🎯  
+- ✅ [Feature 2] 🚀  
+- ✅ [Feature 3] 🔥  
+- ✅ [Feature 4] 🎉  
 
-### Clone the Repository
-```
-clone this project -> git clone https://github.com/yash037/Filehub
-javac App.java
-java App
-```
+## 🏃‍♂️ Steps to Run Locally  
+
+## 🛠️ Tech Stack  
+- **🖥️ Frontend:** [React / Angular / Vue / Other]  
+- **🖥️ Backend:** [Node.js / Go / Python / Other]  
+- **💾 Database:** [PostgreSQL / MongoDB / MySQL / Other]  
+- **🛠️ Other Tools & Libraries:** [List any additional tools]  
+
+---
+
+🚀🔥 **Built with passion during the Weekend of Code!** 🏆💡  
+
+<img src="eg.jpeg" alt="Weekend of Code Logo" height="28px">
